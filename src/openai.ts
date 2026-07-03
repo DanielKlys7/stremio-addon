@@ -1,20 +1,20 @@
 const OPENAI_BASE = "https://api.openai.com/v1";
 const MODEL = process.env.OPENAI_MODEL || "gpt-5.4-nano";
 
-const SYSTEM_PROMPT = `Jesteś parserem nazw plików filmowych (release names).
-Dostajesz surową nazwę pliku torrenta i zwracasz JEDEN krótki, czytelny tytuł.
+export const SYSTEM_PROMPT = `You parse movie release file names.
+You receive a raw torrent file name and return ONE short, readable title.
 
-Zasady:
-- Format: "Tytuł (Rok) · Jakość · Źródło · Audio" — pomijaj części, których nie ma.
-- Usuń: tagi trackerów w [...], nazwy grup release, kropki/podkreślenia jako spacje, rozszerzenia (.mkv, .ts), kodeki (x264, ac3, h265 itd.).
-- Zachowaj istotne: rozdzielczość (1080p, 2160p, 4K), źródło (BluRay, WEB-DL, HDTV), język/dubbing.
-- Polski dubbing (DUB-PL, Dubbing PL) zapisuj DOKŁADNIE jako "(DUB) PL". Analogicznie "Lektor PL", "Napisy PL".
-- NIE używaj emoji ani znaków specjalnych (: / \\ * ? " < > |) — zostaną usunięte.
-- NIE wymyślaj informacji, których nie ma w nazwie.
-- Zwróć TYLKO gotowy tytuł, bez cudzysłowów i komentarzy.
+Rules:
+- Format: "Title (Year) · Quality · Source · Audio" — omit any part that is absent.
+- Strip: tracker tags in [...], release group names, dots/underscores (turn into spaces), file extensions (.mkv, .ts), codecs (x264, ac3, h265, etc.).
+- Keep the essentials: resolution (1080p, 2160p, 4K), source (BluRay, WEB-DL, HDTV).
+- If the name specifies a dubbing/voiceover (lektor) audio language, describe it and append that language's flag emoji. Examples: "DUB-PL"/"Dubbing PL" -> "(DUB) 🇵🇱"; "Lektor PL" -> "(Lektor) 🇵🇱"; "TrueFrench"/"VF"/"VF2" -> "(DUB) 🇫🇷"; "iTA" -> "(DUB) 🇮🇹"; "German" -> "(DUB) 🇩🇪"; "UKR DUB" -> "(DUB) 🇺🇦". Use the correct country flag for the language.
+- If no dub/voiceover language is specified, do not add any flag.
+- Do NOT invent information that is not in the name.
+- Return ONLY the final title, without quotes or comments.
 
-Przykład wejścia: "[tracker] Asterix.Misja.Kleopatra.2002.DUB-PL.1080p.BluRay.x264-GRP.mkv"
-Przykład wyjścia: "Asterix: Misja Kleopatra (2002) 1080p BluRay (DUB) PL"`;
+Example input: "[tracker] Asterix.Misja.Kleopatra.2002.DUB-PL.1080p.BluRay.x264-GRP.mkv"
+Example output: "Asterix: Misja Kleopatra (2002) 1080p BluRay (DUB) 🇵🇱"`;
 
 const cache = new Map<string, string>();
 
@@ -41,7 +41,7 @@ export async function prettifyName(rawName: string): Promise<string> {
           { role: "user", content: rawName },
         ],
         temperature: 0.2,
-        max_tokens: 64,
+        max_completion_tokens: 64,
       }),
     });
 
