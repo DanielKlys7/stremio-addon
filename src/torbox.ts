@@ -74,10 +74,7 @@ export function hasTag(torrent: TorBoxTorrent, tag: string): boolean {
 
 // Scala istniejące tagi z nowymi (bez duplikatów). edittorrent NADPISUJE całą
 // listę tagów, więc trzeba zachować to, co już było.
-export function mergeTags(
-  torrent: TorBoxTorrent,
-  ...add: string[]
-): string[] {
+export function mergeTags(torrent: TorBoxTorrent, ...add: string[]): string[] {
   return Array.from(new Set([...expandTags(torrent.tags), ...add])).filter(
     Boolean,
   );
@@ -93,7 +90,6 @@ export function sanitizeName(name: string): string {
     .slice(0, 200);
 }
 
-// PUT /torrents/edittorrent — aktualizuje nazwę i/lub tagi torrenta.
 export async function editTorrent(
   torrentId: number,
   fields: { name?: string; tags?: string[] },
@@ -114,8 +110,6 @@ export async function editTorrent(
 
 const VIDEO_EXT = /\.(mkv|mp4|avi|mov|webm|m4v|ts|flv|wmv)$/i;
 
-// Wybiera najlepszy plik wideo w torrencie (największy plik z rozszerzeniem wideo,
-// a jeśli takich nie ma — po prostu największy plik).
 export function pickVideoFile(torrent: TorBoxTorrent): TorBoxFile | undefined {
   const files = torrent.files ?? [];
   if (files.length === 0) return undefined;
@@ -124,8 +118,6 @@ export function pickVideoFile(torrent: TorBoxTorrent): TorBoxFile | undefined {
   const pool = videos.length > 0 ? videos : files;
   return pool.reduce((a, b) => (b.size > a.size ? b : a));
 }
-
-// Formatuje rozmiar w bajtach na czytelny string (do wyświetlenia w Stremio).
 export function formatBytes(bytes: number): string {
   if (!bytes || bytes < 0) return "0 B";
   const units = ["B", "KB", "MB", "GB", "TB"];
@@ -136,8 +128,6 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 2)} ${units[i]}`;
 }
 
-// Buduje permalink, który przekierowuje na CDN — Stremio podąża za redirectem.
-// UWAGA: token jest w URL-u; dodatek trzymaj prywatny (bez publishToCentral).
 export function buildStreamUrl(torrentId: number, fileId: number): string {
   const token = getApiKey();
   return `${API_BASE}/torrents/requestdl?token=${token}&torrent_id=${torrentId}&file_id=${fileId}&redirect=true`;

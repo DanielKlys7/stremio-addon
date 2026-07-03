@@ -1,6 +1,3 @@
-// Serwis OpenAI — zamienia surową nazwę pliku/release'u na czytelny tytuł.
-// Klucz czytany wyłącznie ze zmiennej środowiskowej OPENAI_API_KEY.
-
 const OPENAI_BASE = "https://api.openai.com/v1";
 const MODEL = process.env.OPENAI_MODEL || "gpt-5.4-nano";
 
@@ -19,8 +16,6 @@ Zasady:
 Przykład wejścia: "[tracker] Asterix.Misja.Kleopatra.2002.DUB-PL.1080p.BluRay.x264-GRP.mkv"
 Przykład wyjścia: "Asterix: Misja Kleopatra (2002) 1080p BluRay (DUB) PL"`;
 
-// Cache: jedna nazwa surowa -> jeden ładny tytuł. Bez tego każde zapytanie
-// Stremio generowałoby nowe (płatne) wywołania OpenAI.
 const cache = new Map<string, string>();
 
 export async function prettifyName(rawName: string): Promise<string> {
@@ -70,19 +65,15 @@ export async function prettifyName(rawName: string): Promise<string> {
 
 const PL_FLAG = "\u{1F1F5}\u{1F1F1}"; // 🇵🇱
 
-// Zamienia tekstowe markery na flagę emoji — TYLKO do wyświetlenia w Stremio.
-// Na TorBoxie trzymamy wersję ASCII, bo emoji bywa wycinane przy zapisie.
-// "DUB-PL", "DUB PL", "(DUB) PL" -> "(DUB) 🇵🇱"
 export function withPlFlag(title: string): string {
   return title.replace(/\(?\bDUB\)?[\s._-]*PL\b/gi, `(DUB) ${PL_FLAG}`);
 }
 
-// Awaryjne czyszczenie bez LLM — gdy brak klucza lub API padnie.
 export function fallbackClean(rawName: string): string {
   return rawName
-    .replace(/^\[[^\]]*\]\s*/g, "") // wiodący tag trackera [..]
-    .replace(/\.(mkv|mp4|avi|mov|ts|m4v|webm)(\.\w+)?$/i, "") // rozszerzenia
-    .replace(/[._]+/g, " ") // kropki/podkreślenia -> spacje
+    .replace(/^\[[^\]]*\]\s*/g, "")
+    .replace(/\.(mkv|mp4|avi|mov|ts|m4v|webm)(\.\w+)?$/i, "")
+    .replace(/[._]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
