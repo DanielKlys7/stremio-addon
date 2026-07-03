@@ -37,16 +37,16 @@ const manifest: Manifest = {
 
 const builder = new addonBuilder(manifest);
 
-const processed = new Set<string>();
 const inFlight = new Set<string>();
 
 async function ensurePrettyName(torrent: TorBoxTorrent): Promise<void> {
-  if (hasTag(torrent, CHANGED_KEYWORD) || processed.has(torrent.hash)) return;
-  if (inFlight.has(torrent.hash)) return;
+  if (!process.env.OPENAI_API_KEY) return;
+  if (hasTag(torrent, CHANGED_KEYWORD) || inFlight.has(torrent.hash)) return;
 
   inFlight.add(torrent.hash);
   try {
-    const source = pickVideoFile(torrent)?.name ?? torrent.name;
+    const file = pickVideoFile(torrent);
+    const source = file?.short_name ?? file?.name ?? torrent.name;
     const pretty = sanitizeName(await prettifyName(source));
     if (!pretty) return;
 
@@ -55,7 +55,6 @@ async function ensurePrettyName(torrent: TorBoxTorrent): Promise<void> {
 
     torrent.name = pretty;
     torrent.tags = tags;
-    processed.add(torrent.hash);
   } catch (err) {
     console.error(`Nie udało się nazwać torrenta ${torrent.id}:`, err);
   } finally {
