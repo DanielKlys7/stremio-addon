@@ -2,7 +2,6 @@ import express from "express";
 import {
   addonBuilder,
   getRouter,
-  // publishToCentral,
   Manifest,
   Stream,
   ContentType,
@@ -20,8 +19,6 @@ import {
 } from "./torbox";
 import { prettifyName, withPlFlag } from "./openai";
 
-// Flaga oznaczająca, że torrent ma już wygenerowaną ładną nazwę (siedzi w tagach,
-// NIE w nazwie — dzięki temu nie wycieka do Stremio). Konfigurowalna przez .env.
 const CHANGED_KEYWORD = process.env.TORBOX_CHANGED_KEYWORD || "openai-named";
 
 const manifest: Manifest = {
@@ -40,11 +37,6 @@ const manifest: Manifest = {
 
 const builder = new addonBuilder(manifest);
 
-// Dedup w ramach instancji: hashe torrentów już przetworzonych (mylist bywa
-// nieświeży, więc nie polegamy tylko na tagu-fladze). In-flight chroni przed
-// równoległym podwójnym wywołaniem OpenAI dla tego samego torrenta.
-// Uwaga: na hostingu bezserwerowym te zbiory mogą nie przetrwać między
-// requestami — trwałą flagą i tak jest tag CHANGED_KEYWORD na TorBoxie.
 const processed = new Set<string>();
 const inFlight = new Set<string>();
 
@@ -76,7 +68,7 @@ builder.defineStreamHandler(async (args: { type: ContentType; id: string }) => {
     return { streams: [] };
   }
 
-  const imdbId = args.id; // np. "tt0250223"
+  const imdbId = args.id;
 
   try {
     const torrents = await getMyList();
@@ -96,7 +88,7 @@ builder.defineStreamHandler(async (args: { type: ContentType; id: string }) => {
 
       streams.push({
         url: buildStreamUrl(torrent.id, file.id),
-        name: "TorBox",
+        name: "FTP daniel's speciality pizza \u{1F60E}",
         title: `${withPlFlag(torrent.name)}\n${formatBytes(file.size)}`,
       });
     }
@@ -108,8 +100,6 @@ builder.defineStreamHandler(async (args: { type: ContentType; id: string }) => {
   }
 });
 
-// Sekret wymagany w ścieżce URL — bez niego addon zwraca 403.
-// Instalka w Stremio: https://<host>/<ADDON_SECRET>/manifest.json
 export const SECRET = process.env.ADDON_SECRET;
 if (!SECRET) {
   throw new Error(
@@ -120,7 +110,6 @@ if (!SECRET) {
 const app = express();
 const router = getRouter(builder.getInterface());
 
-// Health check (Koyeb / Render / uptime pinger) — nic nie ujawnia.
 app.get("/", (_req, res) => res.status(200).send("OK"));
 
 app.use(

@@ -1,6 +1,3 @@
-// Minimalny klient TorBox API — tylko to, czego potrzebuje wtyczka.
-// Klucz API czytany wyłącznie ze zmiennej środowiskowej.
-
 const API_BASE = "https://api.torbox.app/v1/api";
 
 export interface TorBoxFile {
@@ -38,7 +35,6 @@ function getApiKey(): string {
   return key;
 }
 
-// Prosty cache w pamięci, żeby nie walić do API przy każdym zapytaniu.
 let cache: { at: number; data: TorBoxTorrent[] } | null = null;
 const CACHE_TTL_MS = 60_000;
 
@@ -61,27 +57,20 @@ export async function getMyList(): Promise<TorBoxTorrent[]> {
   return data;
 }
 
-// TorBox przechowuje tagi jako tablicę, ale użytkownik wpisując w dashboardzie
-// "a,b" może zrobić z tego jeden tag "a,b". Rozbijamy po przecinku dla pewności.
 function expandTags(tags?: string[]): string[] {
   return (tags ?? []).flatMap((t) => t.split(",")).map((t) => t.trim());
 }
 
-// Czy torrent jest oznaczony danym tagiem (np. IMDb id albo flagą).
 export function hasTag(torrent: TorBoxTorrent, tag: string): boolean {
   return expandTags(torrent.tags).includes(tag);
 }
 
-// Scala istniejące tagi z nowymi (bez duplikatów). edittorrent NADPISUJE całą
-// listę tagów, więc trzeba zachować to, co już było.
 export function mergeTags(torrent: TorBoxTorrent, ...add: string[]): string[] {
   return Array.from(new Set([...expandTags(torrent.tags), ...add])).filter(
     Boolean,
   );
 }
 
-// TorBox usuwa znaki niebezpieczne dla systemu plików i przycina białe znaki.
-// Robimy to samo lokalnie, żeby nasz stan zgadzał się z tym, co zapisze TorBox.
 export function sanitizeName(name: string): string {
   return name
     .replace(/[:/\\*?"<>|]/g, "")

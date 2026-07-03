@@ -63,7 +63,7 @@ export async function prettifyName(rawName: string): Promise<string> {
   }
 }
 
-const PL_FLAG = "\u{1F1F5}\u{1F1F1}"; // 🇵🇱
+const PL_FLAG = "\u{1F1F5}\u{1F1F1}";
 
 export function withPlFlag(title: string): string {
   return title.replace(/\(?\bDUB\)?[\s._-]*PL\b/gi, `(DUB) ${PL_FLAG}`);
