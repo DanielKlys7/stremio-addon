@@ -1,0 +1,25 @@
+{
+  "name": "stremio-addon",
+  "version": "1.0.0",
+  "description": "Simple example Stremio addon (TypeScript)",
+  "main": "dist/index.js",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node --env-file-if-exists=.env dist/index.js",
+    "dev": "node --env-file-if-exists=.env -r ts-node/register src/index.ts"
+  },
+  "dependencies": {
+    "express": "^4.22.2",
+    "stremio-addon-sdk": "^1.6.10"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.25",
+    "@types/node": "^22.10.0",
+    "@types/stremio-addon-sdk": "^1.6.12",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.2"
+  }
+}

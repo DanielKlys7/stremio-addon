@@ -1,0 +1,144 @@
+// Minimalny klient TorBox API — tylko to, czego potrzebuje wtyczka.
+// Klucz API czytany wyłącznie ze zmiennej środowiskowej.
+
+const API_BASE = "https://api.torbox.app/v1/api";
+
+export interface TorBoxFile {
+  id: number;
+  name: string;
+  short_name?: string;
+  size: number;
+  mimetype?: string;
+}
+
+export interface TorBoxTorrent {
+  id: number;
+  name: string;
+  hash: string;
+  size: number;
+  tags?: string[];
+  download_finished?: boolean;
+  download_present?: boolean;
+  files?: TorBoxFile[];
+}
+
+interface MyListResponse {
+  success: boolean;
+  detail?: string;
+  data?: TorBoxTorrent[];
+}
+
+function getApiKey(): string {
+  const key = process.env.TORBOX_API_KEY;
+  if (!key) {
+    throw new Error(
+      "Brak TORBOX_API_KEY. Ustaw go w pliku .env (patrz .env.example).",
+    );
+  }
+  return key;
+}
+
+// Prosty cache w pamięci, żeby nie walić do API przy każdym zapytaniu.
+let cache: { at: number; data: TorBoxTorrent[] } | null = null;
+const CACHE_TTL_MS = 60_000;
+
+export async function getMyList(): Promise<TorBoxTorrent[]> {
+  if (cache && Date.now() - cache.at < CACHE_TTL_MS) {
+    return cache.data;
+  }
+
+  const res = await fetch(`${API_BASE}/torrents/mylist?bypass_cache=false`, {
+    headers: { Authorization: `Bearer ${getApiKey()}` },
+  });
+
+  if (!res.ok) {
+    throw new Error(`TorBox mylist HTTP ${res.status}`);
+  }
+
+  const json = (await res.json()) as MyListResponse;
+  const data = json.data ?? [];
+  cache = { at: Date.now(), data };
+  return data;
+}
+
+// TorBox przechowuje tagi jako tablicę, ale użytkownik wpisując w dashboardzie
+// "a,b" może zrobić z tego jeden tag "a,b". Rozbijamy po przecinku dla pewności.
+function expandTags(tags?: string[]): string[] {
+  return (tags ?? []).flatMap((t) => t.split(",")).map((t) => t.trim());
+}
+
+// Czy torrent jest oznaczony danym tagiem (np. IMDb id albo flagą).
+export function hasTag(torrent: TorBoxTorrent, tag: string): boolean {
+  return expandTags(torrent.tags).includes(tag);
+}
+
+// Scala istniejące tagi z nowymi (bez duplikatów). edittorrent NADPISUJE całą
+// listę tagów, więc trzeba zachować to, co już było.
+export function mergeTags(
+  torrent: TorBoxTorrent,
+  ...add: string[]
+): string[] {
+  return Array.from(new Set([...expandTags(torrent.tags), ...add])).filter(
+    Boolean,
+  );
+}
+
+// TorBox usuwa znaki niebezpieczne dla systemu plików i przycina białe znaki.
+// Robimy to samo lokalnie, żeby nasz stan zgadzał się z tym, co zapisze TorBox.
+export function sanitizeName(name: string): string {
+  return name
+    .replace(/[:/\\*?"<>|]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 200);
+}
+
+// PUT /torrents/edittorrent — aktualizuje nazwę i/lub tagi torrenta.
+export async function editTorrent(
+  torrentId: number,
+  fields: { name?: string; tags?: string[] },
+): Promise<void> {
+  const res = await fetch(`${API_BASE}/torrents/edittorrent`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${getApiKey()}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ torrent_id: torrentId, ...fields }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`TorBox edittorrent HTTP ${res.status}`);
+  }
+}
+
+const VIDEO_EXT = /\.(mkv|mp4|avi|mov|webm|m4v|ts|flv|wmv)$/i;
+
+// Wybiera najlepszy plik wideo w torrencie (największy plik z rozszerzeniem wideo,
+// a jeśli takich nie ma — po prostu największy plik).
+export function pickVideoFile(torrent: TorBoxTorrent): TorBoxFile | undefined {
+  const files = torrent.files ?? [];
+  if (files.length === 0) return undefined;
+
+  const videos = files.filter((f) => VIDEO_EXT.test(f.name));
+  const pool = videos.length > 0 ? videos : files;
+  return pool.reduce((a, b) => (b.size > a.size ? b : a));
+}
+
+// Formatuje rozmiar w bajtach na czytelny string (do wyświetlenia w Stremio).
+export function formatBytes(bytes: number): string {
+  if (!bytes || bytes < 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const i = Math.min(
+    units.length - 1,
+    Math.floor(Math.log(bytes) / Math.log(1024)),
+  );
+  return `${(bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 2)} ${units[i]}`;
+}
+
+// Buduje permalink, który przekierowuje na CDN — Stremio podąża za redirectem.
+// UWAGA: token jest w URL-u; dodatek trzymaj prywatny (bez publishToCentral).
+export function buildStreamUrl(torrentId: number, fileId: number): string {
+  const token = getApiKey();
+  return `${API_BASE}/torrents/requestdl?token=${token}&torrent_id=${torrentId}&file_id=${fileId}&redirect=true`;
+}
