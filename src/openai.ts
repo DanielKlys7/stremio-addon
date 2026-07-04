@@ -1,5 +1,5 @@
 const OPENAI_BASE = "https://api.openai.com/v1";
-const MODEL = process.env.OPENAI_MODEL || "gpt-5-nano-2025-08-07";
+const DEFAULT_MODEL = "gpt-5-nano-2025-08-07";
 
 export const SYSTEM_PROMPT = `You parse a movie release file name into structured JSON.
 
@@ -43,11 +43,16 @@ const RESPONSE_FORMAT = {
 
 const cache = new Map<string, Release>();
 
-export async function analyzeRelease(rawName: string): Promise<Release> {
-  const cached = cache.get(rawName);
+export async function analyzeRelease(
+  rawName: string,
+  opts: { apiKey?: string; model?: string } = {},
+): Promise<Release> {
+  const model = opts.model || DEFAULT_MODEL;
+  const cacheKey = `${model}:${rawName}`;
+  const cached = cache.get(cacheKey);
   if (cached) return cached;
 
-  const key = process.env.OPENAI_API_KEY;
+  const key = opts.apiKey;
   if (!key) return fallbackRelease(rawName);
 
   try {
@@ -58,7 +63,7 @@ export async function analyzeRelease(rawName: string): Promise<Release> {
         Authorization: `Bearer ${key}`,
       },
       body: JSON.stringify({
-        model: MODEL,
+        model,
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: rawName },
@@ -87,7 +92,7 @@ export async function analyzeRelease(rawName: string): Promise<Release> {
       year: typeof parsed.year === "number" ? parsed.year : null,
       audio: parsed.audio?.trim() || null,
     };
-    cache.set(rawName, result);
+    cache.set(cacheKey, result);
     return result;
   } catch (err) {
     console.error("OpenAI analyzeRelease błąd, używam fallbacku:", err);

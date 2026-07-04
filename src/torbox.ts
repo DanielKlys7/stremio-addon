@@ -25,26 +25,17 @@ interface MyListResponse {
   data?: TorBoxTorrent[];
 }
 
-function getApiKey(): string {
-  const key = process.env.TORBOX_API_KEY;
-  if (!key) {
-    throw new Error(
-      "Brak TORBOX_API_KEY. Ustaw go w pliku .env (patrz .env.example).",
-    );
-  }
-  return key;
-}
-
-let cache: { at: number; data: TorBoxTorrent[] } | null = null;
+const cache = new Map<string, { at: number; data: TorBoxTorrent[] }>();
 const CACHE_TTL_MS = 60_000;
 
-export async function getMyList(): Promise<TorBoxTorrent[]> {
-  if (cache && Date.now() - cache.at < CACHE_TTL_MS) {
-    return cache.data;
+export async function getMyList(apiKey: string): Promise<TorBoxTorrent[]> {
+  const cached = cache.get(apiKey);
+  if (cached && Date.now() - cached.at < CACHE_TTL_MS) {
+    return cached.data;
   }
 
   const res = await fetch(`${API_BASE}/torrents/mylist?bypass_cache=false`, {
-    headers: { Authorization: `Bearer ${getApiKey()}` },
+    headers: { Authorization: `Bearer ${apiKey}` },
   });
 
   if (!res.ok) {
@@ -53,7 +44,7 @@ export async function getMyList(): Promise<TorBoxTorrent[]> {
 
   const json = (await res.json()) as MyListResponse;
   const data = json.data ?? [];
-  cache = { at: Date.now(), data };
+  cache.set(apiKey, { at: Date.now(), data });
   return data;
 }
 
@@ -63,6 +54,20 @@ function expandTags(tags?: string[]): string[] {
 
 export function hasTag(torrent: TorBoxTorrent, tag: string): boolean {
   return expandTags(torrent.tags).includes(tag);
+}
+
+const IMDB_RE = /^tt\d+$/;
+
+export function imdbIdOf(torrent: TorBoxTorrent): string | undefined {
+  return expandTags(torrent.tags).find((t) => IMDB_RE.test(t));
+}
+
+export function tagValue(
+  torrent: TorBoxTorrent,
+  prefix: string,
+): string | undefined {
+  const hit = expandTags(torrent.tags).find((t) => t.startsWith(prefix));
+  return hit ? hit.slice(prefix.length) || undefined : undefined;
 }
 
 export function mergeTags(torrent: TorBoxTorrent, ...add: string[]): string[] {
@@ -80,13 +85,14 @@ export function sanitizeName(name: string): string {
 }
 
 export async function editTorrent(
+  apiKey: string,
   torrentId: number,
   fields: { name?: string; tags?: string[] },
 ): Promise<void> {
   const res = await fetch(`${API_BASE}/torrents/edittorrent`, {
     method: "PUT",
     headers: {
-      Authorization: `Bearer ${getApiKey()}`,
+      Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ torrent_id: torrentId, ...fields }),
@@ -117,7 +123,10 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 2)} ${units[i]}`;
 }
 
-export function buildStreamUrl(torrentId: number, fileId: number): string {
-  const token = getApiKey();
-  return `${API_BASE}/torrents/requestdl?token=${token}&torrent_id=${torrentId}&file_id=${fileId}&redirect=true`;
+export function buildStreamUrl(
+  apiKey: string,
+  torrentId: number,
+  fileId: number,
+): string {
+  return `${API_BASE}/torrents/requestdl?token=${apiKey}&torrent_id=${torrentId}&file_id=${fileId}&redirect=true`;
 }

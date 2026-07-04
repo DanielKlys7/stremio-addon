@@ -1,4 +1,153 @@
 <!doctype html>
+<html lang="en">
+<head>
 <meta charset="utf-8" />
-<title>Stremio addon</title>
-<p>Ten addon jest prywatny. Instalka: <code>/&lt;ADDON_SECRET&gt;/manifest.json</code></p>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TorBox Librarian 📚 — Install in Stremio</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: radial-gradient(1200px 600px at 50% -10%, #1b2440 0%, #0c0e14 60%);
+    color: #e7e9ee; padding: 24px;
+  }
+  .card {
+    width: 100%; max-width: 480px;
+    background: rgba(24, 27, 34, 0.9); border: 1px solid #262a34;
+    border-radius: 18px; padding: 30px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.45);
+    backdrop-filter: blur(6px);
+  }
+  .logo { font-size: 34px; line-height: 1; }
+  h1 { margin: 10px 0 4px; font-size: 22px; }
+  p.sub { margin: 0 0 22px; color: #9aa2b1; }
+
+  label { display: block; margin: 16px 0 6px; font-weight: 600; font-size: 13px; }
+  label small { font-weight: 400; color: #9aa2b1; }
+  input[type=text] {
+    width: 100%; padding: 12px 13px; border-radius: 11px; border: 1px solid #2d323d;
+    background: #0f1115; color: #e7e9ee; font: inherit; transition: border-color .15s, opacity .15s;
+  }
+  input[type=text]:focus { outline: none; border-color: #6f8cff; }
+  input[type=text]:disabled { opacity: .4; cursor: not-allowed; }
+
+  .toggle {
+    display: flex; align-items: center; gap: 11px; margin-top: 22px;
+    padding: 13px 14px; border: 1px solid #2d323d; border-radius: 12px;
+    background: #0f1115; cursor: pointer; user-select: none;
+  }
+  .toggle input { width: 18px; height: 18px; accent-color: #6f8cff; cursor: pointer; }
+  .toggle .t-text { font-weight: 600; font-size: 14px; }
+  .toggle .t-text span { display: block; font-weight: 400; font-size: 12px; color: #9aa2b1; }
+
+  .btn {
+    display: block; width: 100%; margin-top: 22px; padding: 14px; border: 0; border-radius: 12px;
+    background: linear-gradient(135deg, #6f8cff, #8a63ff); color: #fff;
+    font-weight: 700; font-size: 15px; cursor: pointer; transition: opacity .15s, transform .05s;
+  }
+  .btn:active { transform: translateY(1px); }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+  .btn.secondary { background: #2d323d; color: #e7e9ee; margin-top: 10px; }
+
+  .url {
+    margin-top: 16px; padding: 12px; border-radius: 11px; background: #0f1115;
+    border: 1px solid #2d323d; font-family: ui-monospace, "SF Mono", monospace; font-size: 12px;
+    word-break: break-all; color: #9aa2b1;
+  }
+  .note { margin-top: 18px; font-size: 12px; color: #7d8494; }
+  a { color: #6f8cff; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">📚</div>
+  <h1>TorBox Librarian</h1>
+  <p class="sub">Enter your key to install this addon in Stremio.</p>
+
+  <label for="torbox">TorBox API key <small>(required)</small></label>
+  <input id="torbox" type="text" spellcheck="false" placeholder="e.g. 3eb9055d-…" />
+
+  <label class="toggle" for="aimode">
+    <input id="aimode" type="checkbox" />
+    <span class="t-text">Semi-automatic AI Mode
+      <span>Auto-resolve titles &amp; names with OpenAI</span>
+    </span>
+  </label>
+
+  <label for="openai">OpenAI API key <small>(for AI Mode)</small></label>
+  <input id="openai" type="text" spellcheck="false" placeholder="sk-…" disabled />
+
+  <button class="btn" id="install" disabled>Install in Stremio</button>
+  <button class="btn secondary" id="copy" disabled>Copy install URL</button>
+  <div class="url" id="url">Enter your TorBox API key…</div>
+
+  <p class="note">
+    Your install URL embeds your API keys — treat it like a password and don't share it publicly.
+  </p>
+</div>
+
+<script>
+  var torboxEl = document.getElementById('torbox');
+  var aiEl = document.getElementById('aimode');
+  var openaiEl = document.getElementById('openai');
+  var urlEl = document.getElementById('url');
+  var installBtn = document.getElementById('install');
+  var copyBtn = document.getElementById('copy');
+
+  function toB64Url(str) {
+    var b64 = btoa(unescape(encodeURIComponent(str)));
+    return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  function build() {
+    var torbox = torboxEl.value.trim();
+    if (!torbox) return null;
+    var cfg = { torboxApiKey: torbox };
+    if (aiEl.checked && openaiEl.value.trim()) cfg.openaiApiKey = openaiEl.value.trim();
+    return toB64Url(JSON.stringify(cfg));
+  }
+
+  function manifestUrl(enc) {
+    return window.location.origin + '/' + enc + '/manifest.json';
+  }
+
+  function refresh() {
+    openaiEl.disabled = !aiEl.checked;
+    if (!aiEl.checked) openaiEl.value = '';
+
+    var enc = build();
+    if (!enc) {
+      urlEl.textContent = 'Enter your TorBox API key…';
+      installBtn.disabled = true;
+      copyBtn.disabled = true;
+      return;
+    }
+    installBtn.disabled = false;
+    copyBtn.disabled = false;
+    urlEl.textContent = manifestUrl(enc);
+  }
+
+  [torboxEl, openaiEl].forEach(function (el) { el.addEventListener('input', refresh); });
+  aiEl.addEventListener('change', refresh);
+
+  installBtn.addEventListener('click', function () {
+    var enc = build();
+    if (!enc) return;
+    window.location.href = manifestUrl(enc).replace(/^https?:/, 'stremio:');
+  });
+
+  copyBtn.addEventListener('click', function () {
+    var enc = build();
+    if (!enc) return;
+    navigator.clipboard.writeText(manifestUrl(enc));
+    var t = copyBtn.textContent;
+    copyBtn.textContent = 'Copied ✔';
+    setTimeout(function () { copyBtn.textContent = t; }, 1500);
+  });
+
+  refresh();
+</script>
+</body>
+</html>
