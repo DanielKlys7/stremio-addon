@@ -146,12 +146,11 @@ npm run dev
 | `ADDON_SECRET`           | ✅       | Random secret required in the URL path. Acts as your private key. |
 | `TORBOX_API_KEY`         | ✅       | Your TorBox API key.                                              |
 | `OPENAI_API_KEY`         | ✅\*     | For naming and IMDb resolution. Without it, a regex fallback runs. |
-| `OMDB_API_KEY`           | ✅\*     | Movie database used to fetch the real IMDb id.                    |
-| `OPENAI_MODEL`           | ⬜       | Defaults to a small, cheap model.                                 |
+| `OPENAI_MODEL`           | ⬜       | Defaults to `gpt-5-nano-2025-08-07`.                              |
 | `TORBOX_CHANGED_KEYWORD` | ⬜       | The "already named" marker tag (default `openai-named`).          |
 
 \* Required for the AI features; the addon still serves already-matched files
-without them.
+without them. IMDb ids come from **Cinemeta** (no key, free).
 
 Generate a secret:
 
@@ -172,11 +171,54 @@ node -e "console.log(require('crypto').randomBytes(24).toString('hex'))"
 
 ---
 
+## Token & cost report
+
+Each torrent is analyzed by **one** OpenAI call (structured JSON output:
+`{ display_name, search_title, year, audio }`); the IMDb id is then resolved by a
+plain Cinemeta HTTP lookup (no LLM, no key). Below: 15 representative release
+names run through the pipeline.
+
+**Per-model cost** (pricing per 1M tokens; caching does not engage — the ~690-token
+prompt is below OpenAI's 1024-token cache threshold, so `cached_tokens = 0`):
+
+| Model                    | Input | Cached | Output | Avg tokens/req | Cost / 1k requests | Notes                                  |
+| ------------------------ | ----- | ------ | ------ | -------------- | ------------------ | -------------------------------------- |
+| `gpt-5-nano-2025-08-07`  | $0.05 | $0.01  | $0.40  | ~754           | **$0.059**         | cheapest; leaves some codec/group cruft |
+| `gpt-5.4-nano`           | $0.20 | $0.02  | $1.25  | ~747           | **$0.208**         | ~3.5× pricier; cleaner titles           |
+
+At these rates, naming your **entire library of 1000 movies costs about 6 cents**
+(gpt-5-nano) — and it happens once per torrent, then it's cached on TorBox.
+
+**Sample results** (`gpt-5-nano-2025-08-07`, one call each):
+
+| Release (input)                                   | display_name                                              | audio        | Cinemeta id  |
+| ------------------------------------------------- | -------------------------------------------------------- | ------------ | ------------ |
+| Asterix…Misja.Kleopatra.2002.DUB-PL              | Asterix i Obelix: Misja Kleopatra (2002) 1080p BluRay    | (DUB) 🇵🇱     | tt0250223    |
+| Django.Unchained.2012.Lektor.PL                   | Django Unchained (2012) 1080p BluRay                     | (Lektor) 🇵🇱  | tt1853728    |
+| Dune.Part.Two.2024.MULTi.TrueFrench               | Dune Part Two (2024) 2160p WEB-DL                        | (DUB) 🇫🇷     | tt15239678   |
+| Il.Buono.il.Brutto.il.Cattivo.1966.iTA            | Il Buono, il Brutto, il Cattivo (1966) 1080p BluRay      | —            | tt0060196    |
+| Das.Boot.1981.German.DL                           | Das Boot (1981) 1080p BluRay                             | (DUB) 🇩🇪     | tt0082096    |
+| El.Laberinto.del.Fauno.2006.SPANISH               | El Laberinto del Fauno (2006) 1080p BluRay               | —            | tt0457430    |
+| Дюна.2021.UKR.DUB                                  | Дюна (2021) 1080p WEB-DL                                 | (DUB) 🇺🇦     | tt1160419    |
+| Avengers.Endgame.2019.Hindi.Dubbed                | Avengers Endgame (2019) 1080p WEB-DL                     | (DUB) 🇮🇳     | tt4154796    |
+| Kolja.1996.CZ.Dabing                              | Kolja (1996) 1080p BluRay                                | (DUB) 🇨🇿     | tt0116790    |
+| The.Hangover.2009.Lektor.PL                       | The Hangover (2009) 720p BRRip                           | (Lektor) 🇵🇱  | tt1119646    |
+| Spirited.Away.2001.JAPANESE                        | Spirited Away (2001) 1080p BluRay                        | —            | tt0245429    |
+| Michael.2026…MULTi.VF2                             | Michael (2026) 2160p WEB-DL                              | [MULTi]      | tt11378946   |
+| Гражданин-мститель Citizen Vigilante (2026)       | Citizen Vigilante (2026) 1080p WEB-DL                    | (Lektor) 🇷🇺  | tt35309713   |
+
+Notes: the movie **title keeps the language of the release** (a Polish release
+stays Polish); the audio language is shown only by a flag, and `MULTi` releases get
+`[MULTi]`. `search_title` may be translated to English purely to help the Cinemeta
+lookup. Original-language tags (SPANISH, JAPANESE) get no flag.
+
+---
+
 ## Roadmap
 
 - 📺 TV series support (season/episode resolution).
 - 🧾 A small `/review` page for `needs-review` torrents.
-- 🌐 Pluggable id sources (TMDB, Cinemeta) alongside OMDb.
+- 🎯 Original-vs-dub precision (needs a source for the film's original language).
 - 🔁 Configurable resolution triggers (cron vs. on-demand).
 
 ---

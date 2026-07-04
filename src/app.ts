@@ -17,7 +17,7 @@ import {
   sanitizeName,
   TorBoxTorrent,
 } from "./torbox";
-import { prettifyName, withPlFlag } from "./openai";
+import { analyzeRelease } from "./openai";
 
 const CHANGED_KEYWORD = process.env.TORBOX_CHANGED_KEYWORD || "openai-named";
 
@@ -39,27 +39,19 @@ const builder = new addonBuilder(manifest);
 
 const inFlight = new Set<string>();
 
-async function ensurePrettyName(torrent: TorBoxTorrent): Promise<void> {
-  if (!process.env.OPENAI_API_KEY) return;
+function persistName(torrent: TorBoxTorrent, name: string): void {
+  if (!process.env.OPENAI_API_KEY || !name) return;
   if (hasTag(torrent, CHANGED_KEYWORD) || inFlight.has(torrent.hash)) return;
 
   inFlight.add(torrent.hash);
-  try {
-    const file = pickVideoFile(torrent);
-    const source = file?.short_name ?? file?.name ?? torrent.name;
-    const pretty = sanitizeName(await prettifyName(source));
-    if (!pretty) return;
-
-    const tags = mergeTags(torrent, CHANGED_KEYWORD);
-    await editTorrent(torrent.id, { name: pretty, tags });
-
-    torrent.name = pretty;
-    torrent.tags = tags;
-  } catch (err) {
-    console.error(`Nie udało się nazwać torrenta ${torrent.id}:`, err);
-  } finally {
-    inFlight.delete(torrent.hash);
-  }
+  const tags = mergeTags(torrent, CHANGED_KEYWORD);
+  editTorrent(torrent.id, { name, tags })
+    .then(() => {
+      torrent.name = name;
+      torrent.tags = tags;
+    })
+    .catch((err) => console.error(`editTorrent ${torrent.id}:`, err))
+    .finally(() => inFlight.delete(torrent.hash));
 }
 
 builder.defineStreamHandler(async (args: { type: ContentType; id: string }) => {
@@ -78,21 +70,30 @@ builder.defineStreamHandler(async (args: { type: ContentType; id: string }) => {
         (t.download_present ?? t.download_finished ?? true),
     );
 
-    await Promise.all(matches.map(ensurePrettyName));
+    const streams = await Promise.all(
+      matches.map(async (torrent): Promise<Stream | null> => {
+        const file = pickVideoFile(torrent);
+        if (!file) return null;
 
-    const streams: Stream[] = [];
-    for (const torrent of matches) {
-      const file = pickVideoFile(torrent);
-      if (!file) continue;
+        const source = file.short_name ?? file.name ?? torrent.name;
+        const { display_name, audio } = await analyzeRelease(source);
+        persistName(torrent, sanitizeName(display_name));
 
-      streams.push({
-        url: buildStreamUrl(torrent.id, file.id),
-        name: "FTP daniel's speciality pizza \u{1F60E}",
-        title: `${withPlFlag(torrent.name)}\n${formatBytes(file.size)}`,
-      });
-    }
+        const title = [display_name, audio, formatBytes(file.size)]
+          .filter(Boolean)
+          .join("\n");
+        return {
+          url: buildStreamUrl(torrent.id, file.id),
+          name: "FTP daniel's speciality pizza \u{1F60E}",
+          title,
+        };
+      }),
+    );
 
-    return { streams, cacheMaxAge: 60 };
+    return {
+      streams: streams.filter((s): s is Stream => s !== null),
+      cacheMaxAge: 60,
+    };
   } catch (err) {
     console.error("Błąd handlera streamów:", err);
     return { streams: [] };
