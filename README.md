@@ -21,6 +21,7 @@ The addon uses your TorBox tags as a state machine. It only processes files you 
     - **AI Mode**: add the tag `lmt` (requires an OpenAI key). The addon parses the file name with OpenAI, looks the title up against the **Cinemeta** catalog to get the real IMDb ID, and **writes that `tt…` ID back onto the torrent as a tag**. From then on it behaves exactly like a manually-tagged file.
 
     > Tagging IMDb IDs by hand is fine for a handful of files (3–5), but it doesn't scale — doing it for 50+ files quickly becomes tedious. That's where **AI Mode** pays off: tag them all `lmt` and it resolves the IDs for you. If the AI can't confidently match a file, it tags it `needs-review` instead of guessing, so you can fix those few by hand.
+
 2.  **Serving**: When Stremio requests a movie, the addon returns every downloaded torrent tagged with that IMDb ID, with a clean title (generated once by OpenAI and cached back onto the torrent). Stremio's own Cinemeta metadata handles the rest of the UI.
 
 ---
@@ -31,11 +32,11 @@ There are **no server-side secrets**. Host the addon once and share it — every
 `/configure` page, pastes their own keys, and gets a private install URL. The keys are encoded
 into the URL path itself (`https://<host>/<config>/manifest.json`), so the URL _is_ the secret.
 
-| Field            | Required | Description                                               |
-| :--------------- | :------- | :-------------------------------------------------------- |
-| TorBox API key   | ✅       | Your TorBox API key.                                      |
-| OpenAI API key   | ⬜       | Optional. If provided, enables AI auto-naming/resolution. |
-| OpenAI model     | ⬜       | Optional. `gpt-5-nano` (default) or `gpt-5.4-nano`.       |
+| Field          | Required | Description                                               |
+| :------------- | :------- | :-------------------------------------------------------- |
+| TorBox API key | ✅       | Your TorBox API key.                                      |
+| OpenAI API key | ⬜       | Optional. If provided, enables AI auto-naming/resolution. |
+| OpenAI model   | ⬜       | Optional. `gpt-5-nano` (default) or `gpt-5.4-nano`.       |
 
 > Why the path and not `?query=`? Stremio does not forward query strings from `manifest.json`
 > to the follow-up `/stream/...` requests, so configuration must live in the URL path.

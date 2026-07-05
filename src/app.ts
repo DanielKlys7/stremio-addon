@@ -32,7 +32,7 @@ function buildManifest(configured: boolean): Manifest {
     version: "1.0.0",
     name: ADDON_NAME,
     description:
-      "Streamuj swoją bibliotekę TorBox w Stremio: dopasowanie po tagu IMDb, ładne nazwy generowane przez OpenAI.",
+      "Stream your own TorBox library in Stremio. Tag a torrent with its IMDb id (or tag it 'lmt' to let AI resolve the id via Cinemeta), and it shows up on the movie's page with a clean, OpenAI-generated title. Configure with your own TorBox key.",
     catalogs: [],
     resources: ["stream"],
     types: ["movie"],
@@ -190,6 +190,12 @@ app.get("/", (_req, res) => res.redirect("/configure"));
 
 app.get("/configure", (_req, res) => {
   res.type("html").send(configurePage(null));
+});
+
+// Base, key-less manifest — this is the URL you submit to the Stremio catalog.
+// configurationRequired:true makes Stremio open /configure before installing.
+app.get("/manifest.json", (_req, res) => {
+  res.json(buildManifest(false));
 });
 
 // Everything below is scoped to an encoded config in the URL path.
