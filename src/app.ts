@@ -27,7 +27,9 @@ import {
 import { configurePage } from "./configure";
 
 function buildManifest(configured: boolean): Manifest {
-  return {
+  // `stremioAddonsConfig` is not in the SDK's Manifest type but Stremio serves
+  // it verbatim; it's the ownership signature from stremio-addons.net.
+  const manifest: Manifest & { stremioAddonsConfig?: unknown } = {
     id: "org.torbox.librarian",
     version: "1.0.0",
     name: ADDON_NAME,
@@ -37,11 +39,17 @@ function buildManifest(configured: boolean): Manifest {
     resources: ["stream"],
     types: ["movie"],
     idPrefixes: ["tt"],
+    stremioAddonsConfig: {
+      issuer: "https://stremio-addons.net",
+      signature:
+        "eyJhbGciOiJkaXIiLCJlbmMiOiJBMTI4Q0JDLUhTMjU2In0..xO9fltEEFfWHVnaTSVFxqw.ShJYCP_0oUirT4pqwRwRm61XbIFXCRUuPODpTKa2HxpZAg4uV76M2pJTfMKAtNcQLbleflUBq1EYQgJ1BOEos8E3QxFpPZBQz_cIsewHgNqISp0wBPexdaGnbgfdguHi.0dpFb0ZkBxjBxTRGjnvL-A",
+    },
     behaviorHints: {
       configurable: true,
       configurationRequired: !configured,
     },
   };
+  return manifest;
 }
 
 const inFlight = new Set<string>();
